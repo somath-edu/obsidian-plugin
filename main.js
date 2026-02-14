@@ -153,6 +153,7 @@ class AIInputModal extends obsidian.Modal {
     // --- Groq (Llama3) 호출 ---
     async callGroq(text) {
         const prompt = this.getPrompt(text);
+        // [질문하신 URL은 여기에 이미 포함되어 있습니다!]
         const url = "https://api.groq.com/openai/v1/chat/completions";
 
         const response = await obsidian.requestUrl({
