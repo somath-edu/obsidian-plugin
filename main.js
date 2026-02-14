@@ -56,8 +56,9 @@ class AIInputModal extends obsidian.Modal {
         const modelSelect = modelSelectDiv.createEl("select");
         modelSelect.style.marginLeft = "10px";
         
+        // [수정됨] 모델명 표시 텍스트 수정
         const optionGemini = modelSelect.createEl("option", { text: "Google Gemini 1.5 Flash", value: "gemini" });
-        const optionGroq = modelSelect.createEl("option", { text: "Groq (Llama 3 70b)", value: "groq" });
+        const optionGroq = modelSelect.createEl("option", { text: "Groq (Llama 3.3 70b)", value: "groq" });
 
         // 기본값 설정
         modelSelect.value = this.plugin.settings.defaultModel;
@@ -83,12 +84,12 @@ class AIInputModal extends obsidian.Modal {
                 return;
             }
 
-            // API 키 확인
-            if (selectedModel === 'gemini' && !this.plugin.settings.geminiApiKey) {
+            // API 키 확인 (공백 제거 후 확인)
+            if (selectedModel === 'gemini' && !this.plugin.settings.geminiApiKey.trim()) {
                 new obsidian.Notice("설정에서 Gemini API 키를 입력해주세요!");
                 return;
             }
-            if (selectedModel === 'groq' && !this.plugin.settings.groqApiKey) {
+            if (selectedModel === 'groq' && !this.plugin.settings.groqApiKey.trim()) {
                 new obsidian.Notice("설정에서 Groq API 키를 입력해주세요!");
                 return;
             }
@@ -132,7 +133,8 @@ class AIInputModal extends obsidian.Modal {
     // --- Gemini 호출 ---
     async callGemini(text) {
         const prompt = this.getPrompt(text);
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.plugin.settings.geminiApiKey}`;
+        // [수정됨] API 키 뒤에 .trim()을 붙여서 공백 제거
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.plugin.settings.geminiApiKey.trim()}`;
         
         const response = await obsidian.requestUrl({
             url: url,
@@ -140,6 +142,10 @@ class AIInputModal extends obsidian.Modal {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
+
+        if (response.status !== 200) {
+            throw new Error(`Gemini Error: ${response.status}`);
+        }
 
         return response.json.candidates[0].content.parts[0].text;
     }
@@ -154,13 +160,21 @@ class AIInputModal extends obsidian.Modal {
             method: "POST",
             headers: { 
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${this.plugin.settings.groqApiKey}`
+                // [수정됨] API 키 뒤에 .trim()을 붙여서 공백 제거
+                "Authorization": `Bearer ${this.plugin.settings.groqApiKey.trim()}`
             },
             body: JSON.stringify({
-                model: "llama3-70b-8192",
+                // [수정됨] 구버전 모델명을 최신 Llama 3.3 Versatile로 변경 (에러 해결 핵심)
+                model: "llama-3.3-70b-versatile",
                 messages: [{ role: "user", content: prompt }]
             })
         });
+
+        if (response.status !== 200) {
+             // 에러 상세 내용을 보기 위해 로그 추가
+            console.log(response);
+            throw new Error(`Groq Error: ${response.status}`);
+        }
 
         return response.json.choices[0].message.content;
     }
